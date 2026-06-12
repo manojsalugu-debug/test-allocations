@@ -40,3 +40,6 @@ logs/
 
 # generated feature specs
 .features-gen/
+
+# local team demo plan (not for repo)
+public/plan/

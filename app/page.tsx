@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import Image from 'next/image';
 
 type RunStatus = 'idle' | 'queued' | 'in_progress' | 'completed';
 type ReportType = 'ui' | 'api';
+type View = 'list' | 'report';
 
 interface RunEntry {
   id: string;
@@ -24,6 +26,7 @@ interface RunnerState {
 }
 
 const DEPLOY_SECS = 70;
+const PRIMARY = '#05c168';
 
 function useTestRunner(type: ReportType, onReportsReady: () => void) {
   const [state, setState] = useState<RunnerState>({
@@ -106,19 +109,16 @@ function useTestRunner(type: ReportType, onReportsReady: () => void) {
   return { ...state, run };
 }
 
-// ── animation atoms ───────────────────────────────────────────────────────
-
-function Spinner({ size = 14, color = '#6366f1' }: { size?: number; color?: string }) {
+function Spinner({ size = 14, color = PRIMARY }: { size?: number; color?: string }) {
   return (
-    <span style={{
-      display: 'inline-block', width: size, height: size, flexShrink: 0,
-      border: `2px solid ${color}28`, borderTopColor: color,
-      borderRadius: '50%', animation: 'qa-spin 0.75s linear infinite',
-    }} />
+    <span
+      className="alloc-spinner"
+      style={{ width: size, height: size, borderColor: `${color}28`, borderTopColor: color }}
+    />
   );
 }
 
-function PulseDot({ color = '#f59e0b' }: { color?: string }) {
+function PulseDot({ color = '#d97706' }: { color?: string }) {
   return (
     <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 12, height: 12, flexShrink: 0 }}>
       <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: color, animation: 'qa-ping 1.4s ease-out infinite' }} />
@@ -127,7 +127,7 @@ function PulseDot({ color = '#f59e0b' }: { color?: string }) {
   );
 }
 
-function BounceDots({ color = '#7c3aed' }: { color?: string }) {
+function BounceDots({ color = PRIMARY }: { color?: string }) {
   return (
     <span style={{ display: 'inline-flex', gap: 3, alignItems: 'center' }}>
       {([0, 0.18, 0.36] as number[]).map((delay, i) => (
@@ -137,57 +137,43 @@ function BounceDots({ color = '#7c3aed' }: { color?: string }) {
   );
 }
 
-// ── design tokens ─────────────────────────────────────────────────────────
-
-const T = {
-  bg: '#f1f5f9',
-  surface: '#ffffff',
-  border: '#e2e8f0',
-  text: '#1e293b',
-  muted: '#64748b',
-  faint: '#94a3b8',
-  passed: '#059669',   passedBg: '#ecfdf5',
-  failed: '#dc2626',   failedBg: '#fef2f2',
-  running: '#d97706',  runningBg: '#fffbeb',
-  publishing: '#7c3aed', publishingBg: '#f5f3ff',
-  blue: '#4f46e5',
-  uiBadgeBg: '#eef2ff', uiBadgeText: '#4338ca',
-  apiBadgeBg: '#f5f3ff', apiBadgeText: '#7c3aed',
-};
-
-function pill(bg: string, color: string, children: React.ReactNode) {
+function Icon({ name }: { name: 'runs' | 'ui' | 'api' | 'search' }) {
+  const paths = {
+    runs: <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke="currentColor" strokeWidth="1.75" fill="none" strokeLinecap="round" strokeLinejoin="round" />,
+    ui: <><rect x="3" y="4" width="18" height="12" rx="2" stroke="currentColor" strokeWidth="1.75" fill="none" /><path d="M8 20h8" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" /></>,
+    api: <path d="M8 9l-3 3 3 3M16 9l3 3-3 3M13 6l-2 12" stroke="currentColor" strokeWidth="1.75" fill="none" strokeLinecap="round" strokeLinejoin="round" />,
+    search: <><circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.75" fill="none" /><path d="M20 20l-3.5-3.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" /></>,
+  };
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 999, background: bg, color, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
-      {children}
-    </span>
+    <svg className="alloc-nav-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden>
+      {paths[name]}
+    </svg>
   );
 }
 
-// ── badge + button ────────────────────────────────────────────────────────
-
-function InlineBadge({ runner }: { runner: ReturnType<typeof useTestRunner> }) {
+function StatusBadge({ runner }: { runner: ReturnType<typeof useTestRunner> }) {
   const { status, conclusion, publishing, countdown } = runner;
-  if (publishing) return pill(T.publishingBg, T.publishing, <><Spinner size={11} color={T.publishing} />Deploying{countdown !== null ? ` ${countdown}s` : ''}<BounceDots color={T.publishing} /></>);
-  if (status === 'queued')      return pill(T.runningBg, T.running, <><Spinner size={11} color={T.running} />Queued</>);
-  if (status === 'in_progress') return pill(T.runningBg, T.running, <><Spinner size={11} color={T.running} />Running</>);
+  if (publishing) {
+    return (
+      <span className="alloc-pill alloc-pill-info">
+        <Spinner size={11} />Deploying{countdown !== null ? ` ${countdown}s` : ''}<BounceDots />
+      </span>
+    );
+  }
+  if (status === 'queued') return <span className="alloc-pill alloc-pill-warning"><Spinner size={11} color="#d97706" />Queued</span>;
+  if (status === 'in_progress') return <span className="alloc-pill alloc-pill-warning"><Spinner size={11} color="#d97706" />Running</span>;
   if (status === 'completed') {
     const ok = conclusion === 'success';
-    return pill(ok ? T.passedBg : T.failedBg, ok ? T.passed : T.failed, ok ? '✓ Passed' : '✗ Failed');
+    return <span className={`alloc-pill ${ok ? 'alloc-pill-success' : 'alloc-pill-error'}`}>{ok ? '✓ Passed' : '✗ Failed'}</span>;
   }
   return null;
 }
 
-function RunBtn({ runner, label }: { runner: ReturnType<typeof useTestRunner>; label: string }) {
+function RunButton({ runner, label }: { runner: ReturnType<typeof useTestRunner>; label: string }) {
   const busy = runner.triggering || runner.status === 'queued' || runner.status === 'in_progress' || runner.publishing;
   return (
-    <button onClick={runner.run} disabled={busy} style={{
-      padding: '8px 16px', borderRadius: 8, border: 'none',
-      cursor: busy ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600,
-      background: busy ? '#c7d2fe' : T.blue, color: busy ? '#6366f1' : '#fff',
-      display: 'inline-flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap',
-      boxShadow: busy ? 'none' : '0 1px 3px rgba(79,70,229,0.3)',
-    }}>
-      {busy && <Spinner size={12} color={busy ? '#6366f1' : '#fff'} />}
+    <button type="button" onClick={runner.run} disabled={busy} className="alloc-btn alloc-btn-primary">
+      {busy && <Spinner size={12} color="#fff" />}
       {runner.triggering ? 'Triggering…' : runner.status === 'in_progress' ? 'Running…' : runner.publishing ? 'Deploying…' : label}
     </button>
   );
@@ -197,20 +183,89 @@ function fmt(iso: string) {
   return new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-const card: React.CSSProperties = {
-  background: T.surface, borderRadius: 12, border: `1px solid ${T.border}`,
-  boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-};
+function AppShell({
+  view,
+  activeType,
+  onNavigateList,
+  onNavigateReport,
+  topBar,
+  banners,
+  children,
+}: {
+  view: View;
+  activeType: ReportType;
+  onNavigateList: () => void;
+  onNavigateReport: (type: ReportType) => void;
+  topBar: React.ReactNode;
+  banners?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="alloc-shell">
+      <aside className="alloc-sidebar">
+        <div className="alloc-sidebar-logo">
+          <Image src="/logo.svg" alt="Allocations" width={160} height={22} priority />
+        </div>
 
-const gradientHeader: React.CSSProperties = {
-  background: 'linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)',
-  boxShadow: '0 2px 8px rgba(79,70,229,0.25)',
-};
+        <nav className="alloc-sidebar-nav">
+          <div className="alloc-nav-group">
+            <div className="alloc-nav-label">Platform</div>
+            <button type="button" className={`alloc-nav-item${view === 'list' ? ' active' : ''}`} onClick={onNavigateList}>
+              <Icon name="runs" />
+              Test Runs
+            </button>
+          </div>
 
-// ── main ──────────────────────────────────────────────────────────────────
+          <div className="alloc-nav-group">
+            <div className="alloc-nav-label">Reports</div>
+            <button
+              type="button"
+              className={`alloc-nav-item${view === 'report' && activeType === 'ui' ? ' active' : ''}`}
+              onClick={() => onNavigateReport('ui')}
+            >
+              <Icon name="ui" />
+              UI Reports
+            </button>
+            <button
+              type="button"
+              className={`alloc-nav-item${view === 'report' && activeType === 'api' ? ' active' : ''}`}
+              onClick={() => onNavigateReport('api')}
+            >
+              <Icon name="api" />
+              API Reports
+            </button>
+          </div>
+        </nav>
+
+        <div className="alloc-sidebar-footer">
+          <div className="alloc-user-avatar">Q</div>
+          <div className="alloc-user-meta">
+            <div className="alloc-user-name">QA Dashboard</div>
+            <div className="alloc-user-role">Test execution</div>
+          </div>
+        </div>
+      </aside>
+
+      <div className="alloc-main">
+        <header className="alloc-topbar">
+          <div className="alloc-search">
+            <Icon name="search" />
+            <input type="search" placeholder="Search test runs, reports, and workflows…" aria-label="Search" />
+            <span className="alloc-search-kbd alloc-hide-mobile">⌘ K</span>
+          </div>
+          <div className="alloc-topbar-actions">{topBar}</div>
+        </header>
+
+        {banners}
+
+        <div className="alloc-main-body">{children}</div>
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
-  const [view, setView] = useState<'list' | 'report'>('list');
+  const [view, setView] = useState<View>('list');
   const [activeType, setActiveType] = useState<ReportType>('ui');
   const [runs, setRuns] = useState<RunEntry[]>([]);
   const [iframeKey, setIframeKey] = useState(0);
@@ -242,145 +297,177 @@ export default function Home() {
   const passed = runs.filter(r => r.status === 'passed').length;
   const passRate = total ? Math.round((passed / total) * 100) : null;
 
-  // ── REPORT VIEW ──────────────────────────────────────────────────────
+  const topBar = (
+    <>
+      <StatusBadge runner={ui} />
+      <RunButton runner={ui} label="Run UI Tests" />
+      <StatusBadge runner={api} />
+      <RunButton runner={api} label="Run API Tests" />
+    </>
+  );
+
+  const banners = (
+    <>
+      {errorMsg && <div className="alloc-banner alloc-banner-error">⚠ {errorMsg}</div>}
+      {isPublishing && (
+        <div className="alloc-banner alloc-banner-info">
+          <Spinner size={13} />
+          <span>
+            Deploying updated reports
+            {(ui.publishing ? ui : api).countdown !== null ? ` — auto-refreshing in ${(ui.publishing ? ui : api).countdown}s` : '…'}
+          </span>
+          <BounceDots />
+        </div>
+      )}
+    </>
+  );
+
   if (view === 'report') {
     return (
-      <main style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: T.bg }}>
-        <header className="qa-report-header" style={gradientHeader}>
-          <button onClick={() => setView('list')} style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', padding: '6px 12px', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap' }}>← Runs</button>
-          <span style={{ fontSize: 16 }}>🎭</span>
-          <span style={{ fontWeight: 700, fontSize: 14, color: '#fff', whiteSpace: 'nowrap' }}>{activeType.toUpperCase()} Report</span>
-          <div className="qa-report-actions">
-            <InlineBadge runner={runner} />
-            {runner.runUrl && <a href={runner.runUrl} target="_blank" rel="noreferrer" className="qa-hide-mobile" style={{ fontSize: 12, color: '#c7d2fe', textDecoration: 'none', whiteSpace: 'nowrap' }}>View run ↗</a>}
-            {activeType === 'api' && <a href="/api-logs.html" target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#c7d2fe', textDecoration: 'none', border: '1px solid rgba(255,255,255,0.3)', padding: '5px 10px', borderRadius: 6, whiteSpace: 'nowrap' }}>Logs ↗</a>}
-            <RunBtn runner={runner} label={`Run ${activeType.toUpperCase()} Tests`} />
-            <a href={reportSrc} target="_blank" rel="noreferrer" className="qa-hide-mobile" style={{ fontSize: 13, color: '#c7d2fe', textDecoration: 'none', border: '1px solid rgba(255,255,255,0.3)', padding: '5px 10px', borderRadius: 6, whiteSpace: 'nowrap' }}>Open ↗</a>
-          </div>
-        </header>
+      <AppShell
+        view={view}
+        activeType={activeType}
+        onNavigateList={() => setView('list')}
+        onNavigateReport={openReport}
+        topBar={topBar}
+        banners={
+          <>
+            {runner.error && <div className="alloc-banner alloc-banner-error">⚠ {runner.error}</div>}
+            {runner.publishing && (
+              <div className="alloc-banner alloc-banner-info">
+                <Spinner size={13} />
+                Deploying{runner.countdown !== null ? ` — auto-refreshing in ${runner.countdown}s` : '…'}
+              </div>
+            )}
+          </>
+        }
+      >
+        <div className="alloc-content alloc-content-scroll" style={{ paddingBottom: 0, display: 'flex', flexDirection: 'column' }}>
+            <div className="alloc-page-header">
+              <h1 className="alloc-page-title">{activeType === 'ui' ? 'UI' : 'API'} Report</h1>
+              <p className="alloc-page-subtitle">Playwright test results and execution details</p>
+            </div>
 
-        {runner.error && <div style={{ padding: '8px 16px', background: T.failedBg, color: T.failed, fontSize: 13, borderBottom: `1px solid #fecaca` }}>⚠ {runner.error}</div>}
-
-        {runner.publishing && (
-          <div style={{ position: 'relative', overflow: 'hidden', padding: '8px 16px', background: T.publishingBg, borderBottom: `1px solid #ddd6fe`, color: T.publishing, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Spinner size={13} color={T.publishing} />
-            Deploying{runner.countdown !== null ? ` — auto-refreshing in ${runner.countdown}s` : '…'}
-            <span style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg,transparent,${T.publishing},transparent)`, backgroundSize: '200% 100%', animation: 'qa-shimmer 2s linear infinite' }} />
-          </div>
-        )}
-
-        <iframe key={`${reportSrc}-${iframeKey}`} src={reportSrc} style={{ flex: 1, border: 'none', width: '100%' }} title={`${activeType.toUpperCase()} Report`} />
-      </main>
+            <div className="alloc-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+              <div className="alloc-report-toolbar">
+                <button type="button" className="alloc-btn alloc-btn-outline" onClick={() => setView('list')}>← Test Runs</button>
+                <StatusBadge runner={runner} />
+                <div className="alloc-report-toolbar-actions">
+                  {runner.runUrl && (
+                    <a href={runner.runUrl} target="_blank" rel="noreferrer" className="alloc-external-link alloc-hide-mobile">
+                      View GH run ↗
+                    </a>
+                  )}
+                  {activeType === 'api' && (
+                    <a href="/api-logs.html" target="_blank" rel="noreferrer" className="alloc-btn alloc-btn-outline" style={{ textDecoration: 'none' }}>
+                      Logs ↗
+                    </a>
+                  )}
+                  <RunButton runner={runner} label={`Run ${activeType.toUpperCase()} Tests`} />
+                  <a href={reportSrc} target="_blank" rel="noreferrer" className="alloc-btn alloc-btn-outline alloc-hide-mobile" style={{ textDecoration: 'none' }}>
+                    Open ↗
+                  </a>
+                </div>
+              </div>
+              <iframe key={`${reportSrc}-${iframeKey}`} src={reportSrc} className="alloc-report-frame" title={`${activeType.toUpperCase()} Report`} />
+            </div>
+        </div>
+      </AppShell>
     );
   }
 
-  // ── LIST VIEW ────────────────────────────────────────────────────────
   return (
-    <main style={{ minHeight: '100vh', background: T.bg }}>
-
-      <header className="qa-header" style={gradientHeader}>
-        <div className="qa-header-logo">
-          <span style={{ fontSize: 22 }}>🎭</span>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 16, color: '#fff', letterSpacing: '-0.01em' }}>Allocations QA</div>
-            <div style={{ fontSize: 11, color: '#c7d2fe' }}>Test execution dashboard</div>
-          </div>
+    <AppShell
+      view={view}
+      activeType={activeType}
+      onNavigateList={() => setView('list')}
+      onNavigateReport={openReport}
+      topBar={topBar}
+      banners={banners}
+    >
+      <div className="alloc-content alloc-content-scroll">
+        <div className="alloc-page-header">
+          <h1 className="alloc-page-title">Test Runs</h1>
+          <p className="alloc-page-subtitle">Manage and trigger QA test executions</p>
         </div>
 
-        <div className="qa-header-actions">
-          <InlineBadge runner={ui} />
-          <RunBtn runner={ui} label="Run UI Tests" />
-          <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.2)' }} className="qa-hide-mobile" />
-          <InlineBadge runner={api} />
-          <RunBtn runner={api} label="Run API Tests" />
-        </div>
-      </header>
-
-      {errorMsg && (
-        <div style={{ padding: '10px 16px', background: T.failedBg, color: T.failed, fontSize: 13, borderBottom: `1px solid #fecaca` }}>
-          ⚠ {errorMsg}
-        </div>
-      )}
-
-      {isPublishing && (
-        <div style={{ position: 'relative', overflow: 'hidden', padding: '10px 16px', background: T.publishingBg, borderBottom: `1px solid #ddd6fe`, color: T.publishing, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <Spinner size={13} color={T.publishing} />
-          <span>Deploying updated reports{(ui.publishing ? ui : api).countdown !== null ? ` — auto-refreshing in ${(ui.publishing ? ui : api).countdown}s` : '…'}</span>
-          <BounceDots color={T.publishing} />
-          <span style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg,transparent,${T.publishing},transparent)`, backgroundSize: '200% 100%', animation: 'qa-shimmer 2s linear infinite' }} />
-        </div>
-      )}
-
-      <div className="qa-content">
-
-        {/* summary cards */}
         {total > 0 && (
-          <div className="qa-stats">
+          <div className="alloc-stats">
             {[
-              { label: 'Total Runs', value: total, color: T.blue },
-              { label: 'Passed',     value: passed, color: T.passed },
-              { label: 'Failed',     value: total - passed, color: T.failed },
-              { label: 'Pass Rate',  value: `${passRate}%`, color: passRate === 100 ? T.passed : passRate! >= 80 ? T.running : T.failed },
+              { label: 'Total Runs', value: total, color: 'hsl(var(--foreground))' },
+              { label: 'Passed', value: passed, color: 'var(--color-bullish)' },
+              { label: 'Failed', value: total - passed, color: 'var(--color-bearish)' },
+              { label: 'Pass Rate', value: `${passRate}%`, color: passRate === 100 ? 'var(--color-bullish)' : passRate! >= 80 ? '#d97706' : 'var(--color-bearish)' },
             ].map(({ label, value, color }) => (
-              <div key={label} style={{ ...card, padding: '14px 18px' }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{label}</div>
-                <div style={{ fontSize: 24, fontWeight: 800, color }}>{value}</div>
+              <div key={label} className="alloc-card alloc-stat">
+                <div className="alloc-stat-label">{label}</div>
+                <div className="alloc-stat-value" style={{ color }}>{value}</div>
               </div>
             ))}
           </div>
         )}
 
-        {/* runs table */}
-        <div style={{ ...card, overflow: 'hidden' }}>
-          <div style={{ padding: '14px 18px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: T.text }}>Test Runs</h2>
-            {liveRows.length > 0 && <span style={{ fontSize: 11, color: T.running, fontWeight: 600, background: T.runningBg, padding: '2px 8px', borderRadius: 999 }}>● Live</span>}
+        <div className="alloc-card">
+          <div className="alloc-card-header">
+            <h2 className="alloc-card-title">Execution History</h2>
+            {liveRows.length > 0 && <span className="alloc-live-badge">● Live</span>}
           </div>
 
           {allRows.length === 0 ? (
-            <div style={{ padding: '48px 20px', textAlign: 'center', color: T.muted }}>
-              <div style={{ fontSize: 36, marginBottom: 10 }}>🚀</div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: T.text, marginBottom: 6 }}>No runs yet</div>
-              <div style={{ fontSize: 13 }}>Tap <strong>Run UI Tests</strong> or <strong>Run API Tests</strong> to get started.</div>
+            <div className="alloc-empty">
+              <div className="alloc-empty-icon">
+                <Icon name="runs" />
+              </div>
+              <div className="alloc-empty-title">Nothing to display</div>
+              <div className="alloc-empty-text">
+                Run <strong>UI Tests</strong> or <strong>API Tests</strong> from the toolbar to get started.
+              </div>
             </div>
           ) : (
-            <div className="qa-table-wrap">
-              <table className="qa-table">
+            <div className="alloc-table-wrap">
+              <table className="alloc-table">
                 <thead>
-                  <tr style={{ background: '#f8fafc' }}>
-                    <th style={{ padding: '10px 18px', fontWeight: 600, fontSize: 11, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'left', borderBottom: `1px solid ${T.border}` }}>Status</th>
-                    <th style={{ padding: '10px 18px', fontWeight: 600, fontSize: 11, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'left', borderBottom: `1px solid ${T.border}` }}>Type</th>
-                    <th style={{ padding: '10px 18px', fontWeight: 600, fontSize: 11, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'left', borderBottom: `1px solid ${T.border}` }}>Date & Time</th>
-                    <th className="qa-hide-mobile" style={{ padding: '10px 18px', fontWeight: 600, fontSize: 11, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'left', borderBottom: `1px solid ${T.border}` }}>GH Run</th>
-                    <th style={{ padding: '10px 18px', borderBottom: `1px solid ${T.border}` }}></th>
+                  <tr>
+                    <th>Status</th>
+                    <th>Type</th>
+                    <th>Date &amp; Time</th>
+                    <th className="alloc-hide-mobile">GH Run</th>
+                    <th />
                   </tr>
                 </thead>
                 <tbody>
-                  {allRows.map((run, i) => {
+                  {allRows.map(run => {
                     const live = 'live' in run;
-                    const rowBg = i % 2 ? '#f8fafc' : '#fff';
                     return (
-                      <tr key={run.id}
-                        style={{ borderBottom: i < allRows.length - 1 ? `1px solid ${T.border}` : 'none', background: rowBg, transition: 'background 0.1s' }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#eef2ff'; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = rowBg; }}>
-                        <td style={{ padding: '13px 18px' }}>
-                          {live
-                            ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><PulseDot color={T.running} /><span style={{ color: T.running, fontWeight: 700 }}>Running…</span></span>
-                            : pill(run.status === 'passed' ? T.passedBg : T.failedBg, run.status === 'passed' ? T.passed : T.failed, run.status === 'passed' ? '✓ Passed' : '✗ Failed')}
+                      <tr key={run.id}>
+                        <td>
+                          {live ? (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                              <PulseDot />
+                              <span style={{ color: '#d97706', fontWeight: 600 }}>Running…</span>
+                            </span>
+                          ) : (
+                            <span className={`alloc-pill ${run.status === 'passed' ? 'alloc-pill-success' : 'alloc-pill-error'}`}>
+                              {run.status === 'passed' ? '✓ Passed' : '✗ Failed'}
+                            </span>
+                          )}
                         </td>
-                        <td style={{ padding: '13px 18px' }}>
-                          {pill(run.type === 'ui' ? T.uiBadgeBg : T.apiBadgeBg, run.type === 'ui' ? T.uiBadgeText : T.apiBadgeText, run.type.toUpperCase())}
+                        <td>
+                          <span className="alloc-pill alloc-pill-neutral">{run.type.toUpperCase()}</span>
                         </td>
-                        <td style={{ padding: '13px 18px', color: T.muted, whiteSpace: 'nowrap' }}>
+                        <td style={{ color: 'hsl(var(--muted-foreground))', whiteSpace: 'nowrap' }}>
                           {live ? 'Just now…' : fmt(run.date)}
                         </td>
-                        <td className="qa-hide-mobile" style={{ padding: '13px 18px' }}>
-                          {!live && run.runUrl && <a href={run.runUrl} target="_blank" rel="noreferrer" style={{ color: T.faint, fontSize: 12, textDecoration: 'none', fontFamily: 'monospace' }}>#{String(run.id).slice(-8)} ↗</a>}
+                        <td className="alloc-hide-mobile">
+                          {!live && run.runUrl && (
+                            <a href={run.runUrl} target="_blank" rel="noreferrer" className="alloc-external-link">
+                              #{String(run.id).slice(-8)} ↗
+                            </a>
+                          )}
                         </td>
-                        <td style={{ padding: '13px 18px', textAlign: 'right' }}>
+                        <td style={{ textAlign: 'right' }}>
                           {!live && (
-                            <button onClick={() => openReport(run.type)} style={{ padding: '6px 12px', borderRadius: 7, border: `1px solid ${T.border}`, background: 'transparent', color: T.blue, fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                            <button type="button" className="alloc-btn alloc-btn-ghost" onClick={() => openReport(run.type)}>
                               View →
                             </button>
                           )}
@@ -394,6 +481,6 @@ export default function Home() {
           )}
         </div>
       </div>
-    </main>
+    </AppShell>
   );
 }

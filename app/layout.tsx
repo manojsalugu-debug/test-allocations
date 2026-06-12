@@ -1,5 +1,11 @@
 import type { Metadata, Viewport } from 'next';
+import { Manrope } from 'next/font/google';
 import './globals.css';
+
+const manrope = Manrope({
+  subsets: ['latin'],
+  variable: '--font-manrope',
+});
 
 export const metadata: Metadata = {
   title: 'Allocations QA Dashboard',
@@ -13,10 +19,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body style={{ margin: 0, padding: 0, fontFamily: 'system-ui, sans-serif', background: '#f1f5f9', color: '#1e293b' }}>
-        {children}
-      </body>
+    <html lang="en" className={manrope.variable}>
+      <body>{children}</body>
     </html>
   );
 }
