@@ -1,0 +1,55 @@
+name: Run API Tests
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run API tests
+        id: tests
+        continue-on-error: true
+        env:
+          BASE_URL: ${{ secrets.BASE_URL }}
+          TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
+          MAILSAC_API_KEY: ${{ secrets.MAILSAC_API_KEY }}
+        run: npm run test:api
+
+      - name: Publish API report and log
+        run: |
+          [ -f reports/api/index.html ] && cp reports/api/index.html public/api-report.html || true
+          LATEST_LOG=$(ls -t logs/*.log 2>/dev/null | head -1)
+          [ -n "$LATEST_LOG" ] && cp "$LATEST_LOG" public/api-execution.log || true
+
+      - name: Write deploy marker
+        run: |
+          echo "{\"timestamp\": $(date +%s%3N), \"type\": \"api\"}" > public/last-updated.json
+
+      - name: Commit and push
+        env:
+          TEST_OUTCOME: ${{ steps.tests.outcome }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Pull latest first so runs.json is up to date before we append
+          git pull --rebase --autostash origin main
+          # Append this run to the freshly pulled runs.json
+          node scripts/update-runs.js api "$TEST_OUTCOME"
+          git add public/api-report.html public/api-execution.log public/runs.json public/last-updated.json
+          git diff --staged --quiet || git commit -m "chore: update API test report [skip ci]"
+          # Retry push once in case of a concurrent push
+          git push || (git pull --rebase origin main && git push)
