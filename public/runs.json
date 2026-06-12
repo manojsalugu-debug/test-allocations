@@ -1,0 +1,51 @@
+[
+  {
+    "id": "26675534530",
+    "type": "ui",
+    "status": "passed",
+    "date": "2026-05-30T05:20:54.288Z",
+    "runUrl": "https://github.com/Assign4/allocations-qa/actions/runs/26675534530"
+  },
+  {
+    "id": "26675281315",
+    "type": "ui",
+    "status": "passed",
+    "date": "2026-05-30T05:07:36.951Z",
+    "runUrl": "https://github.com/Assign4/allocations-qa/actions/runs/26675281315"
+  },
+  {
+    "id": "26675283059",
+    "type": "api",
+    "status": "passed",
+    "date": "2026-05-30T05:07:21.791Z",
+    "runUrl": "https://github.com/Assign4/allocations-qa/actions/runs/26675283059"
+  },
+  {
+    "id": "26657098112",
+    "type": "ui",
+    "status": "passed",
+    "date": "2026-05-29T19:14:58.045Z",
+    "runUrl": "https://github.com/Assign4/allocations-qa/actions/runs/26657098112"
+  },
+  {
+    "id": "26657100984",
+    "type": "api",
+    "status": "passed",
+    "date": "2026-05-29T19:14:32.785Z",
+    "runUrl": "https://github.com/Assign4/allocations-qa/actions/runs/26657100984"
+  },
+  {
+    "id": "26656286748",
+    "type": "ui",
+    "status": "passed",
+    "date": "2026-05-29T18:57:49.684Z",
+    "runUrl": "https://github.com/Assign4/allocations-qa/actions/runs/26656286748"
+  },
+  {
+    "id": "26656008102",
+    "type": "api",
+    "status": "passed",
+    "date": "2026-05-29T18:51:33.062Z",
+    "runUrl": "https://github.com/Assign4/allocations-qa/actions/runs/26656008102"
+  }
+]

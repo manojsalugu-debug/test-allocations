@@ -1,0 +1,52 @@
+[2026-07-30 05:05:16.235 +0000] DEBUG: Request - POST /api/auth/login
+    module: "api-execution"
+    request: {
+      "url": "https://dashboard.allocations.com/api/auth/login",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "accept": "application/json"
+      },
+      "path": "/api/auth/login",
+      "body": {
+        "email": "test-f89ebba0ea25@mailsac.com"
+      },
+      "timeout": 3000
+    }
+[2026-07-30 05:05:17.228 +0000] DEBUG: Response - 200 - 993ms
+    module: "api-execution"
+    response: {
+      "statusCode": 200,
+      "responseTime": 993,
+      "body": {
+        "status": 200,
+        "message": "An email with a code has been sent."
+      }
+    }
+[2026-07-30 05:05:20.460 +0000] DEBUG: Request - POST /api/auth/verify
+    module: "api-execution"
+    request: {
+      "url": "https://dashboard.allocations.com/api/auth/verify",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "accept": "*/*"
+      },
+      "path": "/api/auth/verify",
+      "body": {
+        "email": "test-f89ebba0ea25@mailsac.com",
+        "token": "756649",
+        "type": "email"
+      },
+      "timeout": 3000
+    }
+[2026-07-30 05:05:20.660 +0000] DEBUG: Response - 200 - 200ms
+    module: "api-execution"
+    response: {
+      "statusCode": 200,
+      "responseTime": 200,
+      "body": {
+        "success": true,
+        "message": "Verification successful"
+      }
+    }
