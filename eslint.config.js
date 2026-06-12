@@ -26,6 +26,6 @@ module.exports = [
   },
   prettier,
   {
-    ignores: ['node_modules', 'dist', '.features-gen', 'reports'],
+    ignores: ['node_modules', 'dist', '.features-gen', 'reports', 'scripts'],
   },
 ];
