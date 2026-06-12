@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-const REPO = 'Assign4/allocations-qa';
+const REPO = 'manojsalugu-debug/test-allocations';
 const WORKFLOWS = {
   ui: 'run-ui-tests.yml',
   api: 'run-api-tests.yml',
