@@ -15,10 +15,13 @@ interface RunEntry {
   runUrl?: string | null;
 }
 
+type LiveRunEntry = RunEntry & { live: true; running: boolean };
+
 interface RunnerState {
   status: RunStatus;
   conclusion: string | null;
   runUrl: string | null;
+  runId: string | null;
   triggering: boolean;
   publishing: boolean;
   countdown: number | null;
@@ -30,16 +33,25 @@ const PRIMARY = '#05c168';
 
 function useTestRunner(type: ReportType, onReportsReady: () => void) {
   const [state, setState] = useState<RunnerState>({
-    status: 'idle', conclusion: null, runUrl: null,
+    status: 'idle', conclusion: null, runUrl: null, runId: null,
     triggering: false, publishing: false, countdown: null, error: null,
   });
   const triggerTimeRef = useRef<number | null>(null);
+  const runIdRef = useRef<string | null>(null);
 
   const checkStatus = useCallback(async () => {
     try {
       const res = await fetch(`/api/test-status?type=${type}`);
       const data = await res.json();
-      setState(s => ({ ...s, status: data.status ?? 'idle', conclusion: data.conclusion ?? null, runUrl: data.html_url ?? null }));
+      const runId = data.run_id ?? null;
+      if (runId) runIdRef.current = runId;
+      setState(s => ({
+        ...s,
+        status: data.status ?? 'idle',
+        conclusion: data.conclusion ?? null,
+        runUrl: data.html_url ?? null,
+        runId,
+      }));
     } catch { /* ignore */ }
   }, [type]);
 
@@ -68,6 +80,7 @@ function useTestRunner(type: ReportType, onReportsReady: () => void) {
       clearInterval(pollId);
       clearTimeout(forceId);
       triggerTimeRef.current = null;
+      runIdRef.current = null;
       setState(s => ({ ...s, publishing: false, countdown: null }));
       onReportsReady();
     };
@@ -76,9 +89,9 @@ function useTestRunner(type: ReportType, onReportsReady: () => void) {
 
     const pollId = setInterval(async () => {
       try {
-        const res = await fetch(`/last-updated.json?_=${Date.now()}`);
-        const data = await res.json();
-        if (data.timestamp > t0 && data.type === type) resolve();
+        const markerRes = await fetch(`/last-updated-${type}.json?_=${Date.now()}`);
+        const marker = await markerRes.json();
+        if (marker.timestamp > t0) resolve();
       } catch { /* ignore */ }
     }, 5_000);
 
@@ -92,14 +105,16 @@ function useTestRunner(type: ReportType, onReportsReady: () => void) {
     try {
       const res = await fetch(`/api/run-tests?type=${type}`, { method: 'POST' });
       if (res.ok) {
-        setState(s => ({ ...s, status: 'queued', conclusion: null, runUrl: null }));
+        setState(s => ({ ...s, status: 'queued', conclusion: null, runUrl: null, runId: null }));
       } else {
         const data = await res.json().catch(() => ({}));
         triggerTimeRef.current = null;
+        runIdRef.current = null;
         setState(s => ({ ...s, error: data.error ?? `Error ${res.status}` }));
       }
     } catch {
       triggerTimeRef.current = null;
+      runIdRef.current = null;
       setState(s => ({ ...s, error: 'Network error.' }));
     } finally {
       setState(s => ({ ...s, triggering: false }));
@@ -268,33 +283,75 @@ export default function Home() {
   const [view, setView] = useState<View>('list');
   const [activeType, setActiveType] = useState<ReportType>('ui');
   const [runs, setRuns] = useState<RunEntry[]>([]);
-  const [iframeKey, setIframeKey] = useState(0);
+  const [iframeKey, setIframeKey] = useState(() => Date.now());
 
   const refreshRuns = useCallback(() => {
-    fetch('/runs.json?_=' + Date.now()).then(r => r.json()).then(d => setRuns(Array.isArray(d) ? d : [])).catch(() => {});
+    fetch('/api/runs?_=' + Date.now())
+      .then(r => r.json())
+      .then(d => setRuns(Array.isArray(d) ? d : []))
+      .catch(() => {
+        fetch('/runs.json?_=' + Date.now())
+          .then(r => r.json())
+          .then(d => setRuns(Array.isArray(d) ? d : []))
+          .catch(() => {});
+      });
   }, []);
 
   useEffect(() => { refreshRuns(); }, [refreshRuns]);
 
-  const onReady = useCallback(() => { setIframeKey(k => k + 1); refreshRuns(); }, [refreshRuns]);
+  const onReady = useCallback(() => {
+    setIframeKey(Date.now());
+    refreshRuns();
+  }, [refreshRuns]);
 
   const ui = useTestRunner('ui', onReady);
   const api = useTestRunner('api', onReady);
 
+  // Keep execution history in sync with GitHub while tests run or reports deploy
+  useEffect(() => {
+    const busy = [ui, api].some(
+      r => r.status === 'queued' || r.status === 'in_progress' || r.publishing
+    );
+    if (!busy) return;
+    const id = setInterval(refreshRuns, 5_000);
+    return () => clearInterval(id);
+  }, [ui.status, ui.publishing, api.status, api.publishing, refreshRuns]);
+
   const openReport = (type: ReportType) => { setActiveType(type); setView('report'); };
   const runner = activeType === 'ui' ? ui : api;
-  const reportSrc = activeType === 'ui' ? '/ui-report/index.html' : '/api-report.html';
+  const reportBase = activeType === 'ui' ? '/ui-report/index.html' : '/api-report.html';
+  const reportSrc = `${reportBase}?v=${iframeKey}`;
 
-  const liveRows: (RunEntry & { live: true })[] = (['ui', 'api'] as const)
-    .filter(t => { const r = t === 'ui' ? ui : api; return r.status === 'queued' || r.status === 'in_progress' || r.publishing; })
-    .map(t => ({ id: `live-${t}`, type: t, status: 'passed' as const, date: new Date().toISOString(), live: true }));
+  const activeRunners = (['ui', 'api'] as const)
+    .map(t => ({ type: t, runner: t === 'ui' ? ui : api }))
+    .filter(({ runner }) =>
+      runner.status === 'queued' ||
+      runner.status === 'in_progress' ||
+      runner.publishing
+    );
 
-  const allRows = [...liveRows, ...runs];
+  const liveIds = new Set(
+    activeRunners.map(({ runner }) => runner.runId).filter(Boolean) as string[]
+  );
+
+  const liveRows: LiveRunEntry[] = activeRunners.map(({ type: t, runner: r }) => ({
+    id: r.runId ?? `live-${t}`,
+    type: t,
+    status: r.conclusion === 'failure' ? 'failed' as const : r.conclusion === 'success' ? 'passed' as const : 'passed' as const,
+    date: new Date().toISOString(),
+    runUrl: r.runUrl,
+    live: true,
+    running: r.status === 'queued' || r.status === 'in_progress',
+  }));
+
+  const historyRows = runs.filter(r => !liveIds.has(r.id));
+  const allRows = [...liveRows, ...historyRows];
   const isPublishing = ui.publishing || api.publishing;
   const errorMsg = ui.error || api.error;
 
-  const total = runs.length;
-  const passed = runs.filter(r => r.status === 'passed').length;
+  const completedRows = [...liveRows.filter(r => !r.running), ...historyRows];
+  const total = completedRows.length;
+  const passed = completedRows.filter(r => r.status === 'passed').length;
   const passRate = total ? Math.round((passed / total) * 100) : null;
 
   const topBar = (
@@ -438,10 +495,11 @@ export default function Home() {
                 <tbody>
                   {allRows.map(run => {
                     const live = 'live' in run;
+                    const running = live && (run as LiveRunEntry).running;
                     return (
                       <tr key={run.id}>
                         <td>
-                          {live ? (
+                          {running ? (
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                               <PulseDot />
                               <span style={{ color: '#d97706', fontWeight: 600 }}>Running…</span>
@@ -456,17 +514,17 @@ export default function Home() {
                           <span className="alloc-pill alloc-pill-neutral">{run.type.toUpperCase()}</span>
                         </td>
                         <td style={{ color: 'hsl(var(--muted-foreground))', whiteSpace: 'nowrap' }}>
-                          {live ? 'Just now…' : fmt(run.date)}
+                          {running ? 'Just now…' : fmt(run.date)}
                         </td>
                         <td className="alloc-hide-mobile">
-                          {!live && run.runUrl && (
+                          {!running && run.runUrl && (
                             <a href={run.runUrl} target="_blank" rel="noreferrer" className="alloc-external-link">
                               #{String(run.id).slice(-8)} ↗
                             </a>
                           )}
                         </td>
                         <td style={{ textAlign: 'right' }}>
-                          {!live && (
+                          {!running && (
                             <button type="button" className="alloc-btn alloc-btn-ghost" onClick={() => openReport(run.type)}>
                               View →
                             </button>

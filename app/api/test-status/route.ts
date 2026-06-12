@@ -39,5 +39,7 @@ export async function GET(request: Request) {
     conclusion: run.conclusion as string | null,
     html_url: run.html_url as string,
     updated_at: run.updated_at as string,
+    run_id: String(run.id),
+    created_at: run.created_at as string,
   });
 }
