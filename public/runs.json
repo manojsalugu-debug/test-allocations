@@ -1,5 +1,12 @@
 [
   {
+    "id": "27419868782",
+    "type": "ui",
+    "status": "passed",
+    "date": "2026-06-12T13:50:01.199Z",
+    "runUrl": "https://github.com/manojsalugu-debug/test-allocations/actions/runs/27419868782"
+  },
+  {
     "id": "27419871673",
     "type": "api",
     "status": "passed",
